@@ -1,48 +1,57 @@
-# routers/activities.py — Activity CRUD endpoints
+# routers/activities.py — Activity CRUD with device_id support
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 
 from app.database.db import get_db
 from app.models.models import Activity
-from app.schemas.schemas import ActivityCreate, ActivityOut
 
 router = APIRouter(prefix="/activities", tags=["Activities"])
 
 
+class ActivityCreate(BaseModel):
+    type:      str
+    duration:  int
+    calories:  Optional[int]   = 0
+    steps:     Optional[int]   = 0
+    notes:     Optional[str]   = ""
+    date:      str
+    device_id: Optional[str]   = "default"
+
+
+class ActivityOut(ActivityCreate):
+    id: int
+    class Config:
+        from_attributes = True
+
+
 @router.get("/", response_model=List[ActivityOut])
-def get_all(date: str = None, db: Session = Depends(get_db)):
-    """Get all activities. Optionally filter by date (YYYY-MM-DD)."""
-    query = db.query(Activity)
+def get_all(date: str = None, device_id: str = "default", db: Session = Depends(get_db)):
+    q = db.query(Activity).filter(Activity.device_id == device_id)
     if date:
-        query = query.filter(Activity.date == date)
-    return query.order_by(Activity.created_at.desc()).all()
+        q = q.filter(Activity.date == date)
+    return q.order_by(Activity.created_at.desc()).all()
 
 
 @router.post("/", response_model=ActivityOut)
 def create_activity(payload: ActivityCreate, db: Session = Depends(get_db)):
-    """Log a new activity."""
     activity = Activity(**payload.model_dump())
-    db.add(activity)
-    db.commit()
-    db.refresh(activity)
+    db.add(activity); db.commit(); db.refresh(activity)
     return activity
 
 
 @router.get("/{activity_id}", response_model=ActivityOut)
 def get_one(activity_id: int, db: Session = Depends(get_db)):
-    activity = db.query(Activity).filter(Activity.id == activity_id).first()
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    return activity
+    a = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not a: raise HTTPException(404, "Not found")
+    return a
 
 
 @router.delete("/{activity_id}")
 def delete_activity(activity_id: int, db: Session = Depends(get_db)):
-    activity = db.query(Activity).filter(Activity.id == activity_id).first()
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    db.delete(activity)
-    db.commit()
-    return {"message": "Deleted successfully"}
+    a = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not a: raise HTTPException(404, "Not found")
+    db.delete(a); db.commit()
+    return {"message": "Deleted"}

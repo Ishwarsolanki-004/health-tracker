@@ -94,7 +94,7 @@ export default function Goals({ goals, onUpdateGoals, profile, onUpdateProfile, 
           {!editProfile
             ? <Btn onClick={()=>{setTmpProfile(profile);setEditProfile(true)}} color="var(--blue)" variant="outline">Edit Profile</Btn>
             : <div style={{ display:'flex', gap:10 }}>
-                <Btn onClick={async()=>{ await onUpdateProfile(tmpProfile); setEditProfile(false); showToast('✅ Profile saved!') }} color="var(--green)">Save</Btn>
+                <Btn onClick={async()=>{ await onUpdateProfile(tmpProfile); setEditProfile(false); showToast('✅ Profile saved!') }} color="var(--green)"> <span style={{ color:'white'}}>Save</span></Btn>
                 <Btn onClick={()=>setEditProfile(false)} color="var(--muted2)" variant="outline">Cancel</Btn>
               </div>
           }

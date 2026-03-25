@@ -1,97 +1,121 @@
 import { useState } from 'react'
 import { GlassInput, GlassSelect, Btn, Badge, SectionTitle } from '../components/GlassInput'
-import StatCard from '../components/StatCard'
 
-const today = new Date().toISOString().split('T')[0]
-const QUALITY = ['Excellent','Good','Fair','Poor']
-const Q_COLORS = { Excellent:'var(--green)', Good:'var(--teal)', Fair:'var(--orange)', Poor:'#ef4444' }
+const today   = new Date().toISOString().split('T')[0]
+const QUALITY = ['Excellent','Good','Fair','Poor','Very Poor']
+
+function calcDuration(bed, wake) {
+  if (!bed || !wake) return 0
+  const [bh,bm] = bed.split(':').map(Number)
+  const [wh,wm] = wake.split(':').map(Number)
+  let diff = (wh*60+wm) - (bh*60+bm)
+  if (diff < 0) diff += 1440
+  return +(diff/60).toFixed(1)
+}
+
+function qualityInfo(hrs) {
+  if (hrs >= 8) return { label:'Excellent 🌟', color:'#22d3a5' }
+  if (hrs >= 7) return { label:'Good 👍',       color:'#00ffe7' }
+  if (hrs >= 6) return { label:'Fair ⚠️',       color:'#fb923c' }
+  return               { label:'Poor 😞',       color:'#ef4444' }
+}
 
 export default function Sleep({ sleepLogs, onAdd, onDelete, showToast }) {
-  const [form, setForm] = useState({ bedtime:'', wakeup:'', quality:'Good', date:today })
-  const f = k => v => setForm(p=>({...p,[k]:v}))
+  const [date,    setDate]    = useState(today)
+  const [bedtime, setBedtime] = useState('')
+  const [wakeup,  setWakeup]  = useState('')
+  const [quality, setQuality] = useState('Good')
 
-  const todaySleep = sleepLogs.find(s=>s.date===today)
-  const weekEntries = sleepLogs.slice(0,7)
-  const weekAvg = weekEntries.length
-    ? (weekEntries.reduce((s,l)=>s+(l.duration||0),0)/weekEntries.length).toFixed(1)
-    : 0
+  const duration = calcDuration(bedtime, wakeup)
+  const qi       = qualityInfo(duration)
+  const last     = sleepLogs[0]
+  const weekAvg  = sleepLogs.length
+    ? +(sleepLogs.slice(0,7).reduce((s,l)=>s+(l.duration||0),0)/Math.min(sleepLogs.length,7)).toFixed(1) : 0
 
-  const previewDur = () => {
-    if (!form.bedtime||!form.wakeup) return null
-    const [bh,bm]=form.bedtime.split(':').map(Number)
-    const [wh,wm]=form.wakeup.split(':').map(Number)
-    let diff=(wh*60+wm)-(bh*60+bm)
-    if(diff<0) diff+=1440
-    return (diff/60).toFixed(1)
+  const handleLog = async () => {
+    if (!bedtime || !wakeup) { showToast('⚠️ Enter bedtime & wake up time!'); return }
+    await onAdd({ bedtime, wakeup, quality, date })
+    showToast(`✅ Sleep logged! ${duration} hrs — ${quality}`)
+    setBedtime(''); setWakeup('')
   }
-
-  const submit = async () => {
-    if (!form.bedtime||!form.wakeup) { showToast('⚠️ Bedtime & wakeup required!'); return }
-    await onAdd(form)
-    setForm({ bedtime:'', wakeup:'', quality:'Good', date:today })
-    showToast('✅ Sleep logged!')
-  }
-
-  const dur = previewDur()
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
-        <StatCard icon="😴" label="Last Night" value={todaySleep?.duration||0} unit="hrs" color="var(--violet)" delay={0} />
-        <StatCard icon="⭐" label="Quality"    value={todaySleep?.quality||'—'}        color="var(--orange)"  delay={0.07} />
-        <StatCard icon="📊" label="Week Avg"   value={weekAvg}               unit="hrs" color="var(--teal)"   delay={0.14} />
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+      
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
+        {[
+          { icon:'😴', label:'Last Night', value:(last?.duration||0)+' hrs', color:'#a78bfa' },
+          { icon:'⭐', label:'Quality',    value:last?.quality||'—',         color:'#00ffe7' },
+          { icon:'📊', label:'Week Avg',   value:weekAvg+' hrs',             color:'#38bdf8' },
+        ].map(s => (
+          <div key={s.label} className="glass" style={{ padding:'12px 10px', textAlign:'center', borderTop:`2px solid ${s.color}44` }}>
+            <div style={{ fontSize:20, marginBottom:5 }}>{s.icon}</div>
+            <div style={{ color:s.color, fontFamily:"'Orbitron',monospace", fontSize:14, fontWeight:900 }}>{s.value}</div>
+            <div style={{ color:'#94a3b8', fontSize:10, marginTop:3 }}>{s.label}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="glass fade-up delay-1" style={{ padding:28 }}>
+      
+      <div className="glass fade-up" style={{ padding:22, borderTop:'2px solid #a78bfa' }}>
         <SectionTitle icon="🌙" color="var(--violet)">Log Sleep</SectionTitle>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <GlassInput  label="Date" type="date" value={form.date} onChange={f('date')} />
-          <GlassSelect label="Sleep Quality" value={form.quality} onChange={f('quality')} options={QUALITY} />
-          <GlassInput  label="Bedtime" type="time" value={form.bedtime} onChange={f('bedtime')} />
-          <GlassInput  label="Wake Up" type="time" value={form.wakeup}  onChange={f('wakeup')} />
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+          <GlassInput label="Date"          type="date" value={date}    onChange={setDate}/>
+          <GlassSelect label="Sleep Quality" value={quality} onChange={setQuality} options={QUALITY}/>
+          <GlassInput label="Bedtime"  type="time" value={bedtime} onChange={setBedtime}/>
+          <GlassInput label="Wake Up"  type="time" value={wakeup}  onChange={setWakeup}/>
         </div>
 
-        {dur && (
-          <div style={{
-            marginTop:18, padding:'14px 20px',
-            background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.25)',
-            borderRadius:14, display:'flex', alignItems:'center', gap:16
-          }}>
-            <span style={{ fontSize:28 }}>🌙</span>
-            <div>
-              <div style={{ color:'var(--violet)', fontFamily:'var(--font-head)', fontSize:22, fontWeight:900 }}>{dur} hrs</div>
-              <div style={{ color:'var(--muted)', fontSize:11 }}>
-                {dur>=8?'✅ Excellent sleep!':dur>=7?'👍 Good sleep':dur>=6?'⚠️ Slightly short':'❌ Not enough rest'}
-              </div>
-            </div>
-            <Badge color={Q_COLORS[form.quality]||'var(--teal)'}>{form.quality}</Badge>
+        {duration > 0 && (
+          <div style={{ background:'rgba(167,139,250,0.1)', border:'1px solid rgba(167,139,250,0.35)', borderRadius:12, padding:14, textAlign:'center', marginBottom:14 }}>
+            <div style={{ color:'#a78bfa', fontFamily:"'Orbitron',monospace", fontSize:34, fontWeight:900 }}>{duration} hrs</div>
+            <div style={{ color:qi.color, fontSize:14, marginTop:4, fontWeight:700 }}>{qi.label}</div>
           </div>
         )}
-        <div style={{ marginTop:18 }}>
-          <Btn onClick={submit} color="var(--violet)" icon="🌙">Log Sleep</Btn>
-        </div>
+
+        
+        <button onClick={handleLog} style={{
+          width:'100%',
+          background:'rgba(167,139,250,0.15)',
+          border:'1.5px solid rgba(167,139,250,0.55)',
+          borderRadius:10, padding:'12px',
+          color:'#a78bfa',
+          fontWeight:700, fontSize:12,
+          cursor:'pointer', fontFamily:"'Orbitron',monospace",
+          display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+          boxShadow:'none', minHeight:46,
+        }}>
+          <span>🌙</span>
+          <span>LOG SLEEP</span>
+        </button>
       </div>
 
-      <div className="glass fade-up delay-2" style={{ padding:24 }}>
-        <SectionTitle icon="📋" color="var(--muted2)">Sleep History ({sleepLogs.length})</SectionTitle>
-        {sleepLogs.length===0 ? (
-          <div style={{ color:'var(--muted)', textAlign:'center', padding:48, fontFamily:'var(--font-head)', letterSpacing:2 }}>NO SLEEP LOGGED YET</div>
+      
+      <div className="glass fade-up delay-1" style={{ padding:20 }}>
+        <SectionTitle icon="📈" color="var(--violet)">Sleep History ({sleepLogs.length})</SectionTitle>
+        {sleepLogs.length === 0 ? (
+          <div style={{ color:'#94a3b8', textAlign:'center', padding:28, fontFamily:"'Orbitron',monospace", fontSize:11 }}>NO SLEEP LOGGED YET</div>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:340, overflowY:'auto' }}>
-            {sleepLogs.map(s => (
-              <div key={s.id} className="glass-sm" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 16px' }}>
-                <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-                  <span style={{ fontSize:20 }}>🌙</span>
-                  <span style={{ color:'var(--muted2)', fontSize:12, fontFamily:'var(--font-head)' }}>{s.date}</span>
-                  <span style={{ color:'var(--text)' }}>{s.bedtime} → {s.wakeup}</span>
-                  <Badge color={Q_COLORS[s.quality]||'var(--teal)'}>{s.quality}</Badge>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {sleepLogs.slice(0,10).map(s => {
+              const q = qualityInfo(s.duration||0)
+              return (
+                <div key={s.id} style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'11px 14px' }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                      <span style={{ color:'#a78bfa', fontFamily:"'Orbitron',monospace", fontSize:15, fontWeight:900 }}>{s.duration||0} hrs</span>
+                      <Badge color="var(--violet)">{s.quality}</Badge>
+                    </div>
+                    <div style={{ color:'#94a3b8', fontSize:11 }}>{s.date} · {s.bedtime} → {s.wakeup}</div>
+                    <div style={{ height:4, background:'rgba(255,255,255,0.07)', borderRadius:999, marginTop:6, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${Math.min((s.duration||0)/8*100,100)}%`, background:'#a78bfa', borderRadius:999 }}/>
+                    </div>
+                  </div>
+                  <button onClick={()=>{ onDelete(s.id); showToast('Deleted') }} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', minHeight:'auto', padding:0, flexShrink:0 }}>✕</button>
                 </div>
-                <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-                  <span style={{ color:'var(--violet)', fontFamily:'var(--font-head)', fontWeight:900, fontSize:15 }}>{s.duration} hrs</span>
-                  <button onClick={()=>onDelete(s.id)} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', cursor:'pointer', borderRadius:8, width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13 }}>✕</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

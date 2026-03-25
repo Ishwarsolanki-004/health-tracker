@@ -1,140 +1,120 @@
+function hexToRgb(hex){const h=(hex||'#38bdf8').replace('#','');return `${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)}`}
+
 import { useState } from 'react'
-import { GlassInput, GlassSelect, Btn, Badge, SectionTitle } from '../components/GlassInput'
-import StatCard from '../components/StatCard'
+import { GlassInput, GlassSelect, Badge, SectionTitle } from '../components/GlassInput'
 
 const today = new Date().toISOString().split('T')[0]
-const MEALS = ['Breakfast','Lunch','Dinner','Snack']
-const MEAL_ICONS = { Breakfast:'🌅', Lunch:'☀️', Dinner:'🌙', Snack:'🍿' }
+const MEALS  = ['Breakfast','Lunch','Dinner','Snack','Pre-Workout','Post-Workout']
+const MEAL_IC= { Breakfast:'🌅', Lunch:'☀️', Dinner:'🌙', Snack:'🍎', 'Pre-Workout':'⚡', 'Post-Workout':'💪' }
+const MEAL_COL={ Breakfast:'#fb923c', Lunch:'#38bdf8', Dinner:'#a78bfa', Snack:'#22d3a5', 'Pre-Workout':'#00ffe7', 'Post-Workout':'#ff2d78' }
 
-export default function Nutrition({ nutrition = [], onAdd, onDelete, showToast }) {
-  const [form, setForm] = useState({
-    meal:'Breakfast', item:'', calories:'', protein:'', carbs:'', fat:'', date:today
-  })
-  const f = k => v => setForm(p => ({ ...p, [k]: v }))
+export default function Nutrition({ nutrition, onAdd, onDelete, showToast }) {
+  const [meal,    setMeal]    = useState('Breakfast')
+  const [item,    setItem]    = useState('')
+  const [calories,setCalories]= useState('')
+  const [protein, setProtein] = useState('')
+  const [carbs,   setCarbs]   = useState('')
+  const [fat,     setFat]     = useState('')
+  const [date,    setDate]    = useState(today)
 
-  const todayNut   = nutrition.filter(n => n.date === today)
-  const todayCalIn = todayNut.reduce((s, n) => s + (Number(n.calories) || 0), 0)
-  const todayProt  = +todayNut.reduce((s, n) => s + (Number(n.protein) || 0), 0).toFixed(1)
-  const todayCarbs = +todayNut.reduce((s, n) => s + (Number(n.carbs) || 0), 0).toFixed(1)
-  const todayFat   = +todayNut.reduce((s, n) => s + (Number(n.fat) || 0), 0).toFixed(1)
-  const totalMacro = (todayProt + todayCarbs + todayFat) || 1
+  const mealColor = MEAL_COL[meal] || '#38bdf8'
 
-  const submit = async () => {
-    if (!form.item || !form.calories) { showToast('⚠️ Item & calories required!'); return }
-    await onAdd({
-      ...form,
-      calories: Number(form.calories),
-      protein:  Number(form.protein) || 0,
-      carbs:    Number(form.carbs) || 0,
-      fat:      Number(form.fat) || 0,
-    })
-    setForm({ meal:'Breakfast', item:'', calories:'', protein:'', carbs:'', fat:'', date:today })
-    showToast('✅ Meal logged!')
+  const handleLog = async () => {
+    if (!item.trim())  { showToast('⚠️ Enter food item!'); return }
+    if (!calories)     { showToast('⚠️ Enter calories!'); return }
+    await onAdd({ meal, item:item.trim(), calories:Number(calories), protein:Number(protein)||0, carbs:Number(carbs)||0, fat:Number(fat)||0, date })
+    showToast(`✅ ${meal} logged!`)
+    setItem(''); setCalories(''); setProtein(''); setCarbs(''); setFat('')
   }
 
-  const macros = [
-    { val: todayProt,  color: 'var(--green)',  label: 'P' },
-    { val: todayCarbs, color: 'var(--orange)', label: 'C' },
-    { val: todayFat,   color: 'var(--pink)',   label: 'F' },
-  ]
+  const todayNut   = Array.isArray(nutrition) ? nutrition.filter(n=>n.date===today) : []
+  const totalCal   = todayNut.reduce((s,n)=>s+(n.calories||0),0)
+  const totalProt  = todayNut.reduce((s,n)=>s+(n.protein||0),0)
+  const totalCarb  = todayNut.reduce((s,n)=>s+(n.carbs||0),0)
+  const totalFat   = todayNut.reduce((s,n)=>s+(n.fat||0),0)
+  const macroTotal = totalProt+totalCarb+totalFat||1
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
-      {/* Today macros */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-        <StatCard icon="🔥" label="Calories" value={todayCalIn} unit="kcal" color="var(--blue)"   delay={0}    />
-        <StatCard icon="🥩" label="Protein"  value={todayProt}  unit="g"   color="var(--green)"  delay={0.06} />
-        <StatCard icon="🍞" label="Carbs"    value={todayCarbs} unit="g"   color="var(--orange)" delay={0.12} />
-        <StatCard icon="🧈" label="Fat"      value={todayFat}   unit="g"   color="var(--pink)"   delay={0.18} />
-      </div>
-
-      {/* Macro split bar */}
-      <div className="glass fade-up" style={{ padding:'20px 24px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:14 }}>
-          <span style={{ color:'var(--blue)', fontFamily:'var(--font-head)', fontSize:13, fontWeight:700, letterSpacing:1 }}>📊 MACRO SPLIT TODAY</span>
-          <div style={{ flex:1, height:1, background:'linear-gradient(90deg,var(--blue)30,transparent)' }} />
-          <div style={{ display:'flex', gap:12 }}>
-            {macros.map(m => (
-              <span key={m.label} style={{ color:m.color, fontSize:11, fontFamily:'var(--font-head)', fontWeight:700 }}>
-                {m.label} {Math.round((m.val/totalMacro)*100)}%
-              </span>
+      
+      {todayNut.length>0 && (
+        <div className="glass fade-up" style={{ padding:18, borderTop:'2px solid #38bdf8' }}>
+          <SectionTitle icon="📊" color="var(--blue)">Today's Nutrition</SectionTitle>
+          <div style={{ display:'flex', justifyContent:'space-around', marginBottom:10, flexWrap:'wrap', gap:8 }}>
+            {[['Calories',totalCal,'kcal','#38bdf8'],['Protein',totalProt.toFixed(0),'g','#22d3a5'],['Carbs',totalCarb.toFixed(0),'g','#fb923c'],['Fat',totalFat.toFixed(0),'g','#ff2d78']].map(([l,v,u,c])=>(
+              <div key={l} style={{ textAlign:'center' }}>
+                <div style={{ color:c, fontFamily:"'Orbitron',monospace", fontSize:20, fontWeight:900 }}>{v}</div>
+                <div style={{ color:'#94a3b8', fontSize:10 }}>{u} {l}</div>
+              </div>
             ))}
           </div>
+          <div style={{ height:8, borderRadius:999, overflow:'hidden', display:'flex' }}>
+            <div style={{ width:`${totalProt/macroTotal*100}%`, background:'#22d3a5' }}/>
+            <div style={{ width:`${totalCarb/macroTotal*100}%`, background:'#fb923c' }}/>
+            <div style={{ width:`${totalFat/macroTotal*100}%`,  background:'#ff2d78' }}/>
+          </div>
         </div>
-        <div style={{ display:'flex', height:14, borderRadius:999, overflow:'hidden', gap:2 }}>
-          {macros.map(m => (
-            <div key={m.label} style={{
-              width: `${(m.val / totalMacro) * 100}%`,
-              minWidth: m.val > 0 ? 4 : 0,
-              height: '100%',
-              background: m.color,
-              boxShadow: `0 0 8px ${m.color}66`,
-              transition: 'width 0.8s cubic-bezier(.4,0,.2,1)',
-              borderRadius: 999,
-            }} />
+      )}
+
+      
+      <div className="glass fade-up delay-1" style={{ padding:22, borderTop:`2px solid ${mealColor}` }}>
+        <SectionTitle icon="🍽️" color="var(--blue)">Log Meal</SectionTitle>
+
+        
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+          {MEALS.map(m => (
+            <button key={m} onClick={()=>setMeal(m)} style={{
+              padding:'8px 12px', borderRadius:10,
+              border: `2px solid ${meal===m ? MEAL_COL[m] : 'rgba(255,255,255,0.1)'}`,
+              background: meal===m ? `${MEAL_COL[m]}22` : 'rgba(255,255,255,0.03)',
+              color: meal===m ? MEAL_COL[m] : '#94a3b8',
+              fontFamily:"'Orbitron',monospace", fontSize:9, cursor:'pointer',
+              fontWeight: meal===m ? 700 : 400,
+              display:'flex', alignItems:'center', gap:4, minHeight:'auto',
+            }}>
+              <span>{MEAL_IC[m]}</span>{m}
+            </button>
           ))}
         </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+          <GlassInput label="Food Item"   value={item}    onChange={setItem}     placeholder="e.g. Dal Rice" style={{ gridColumn:'span 2' }}/>
+          <GlassInput label="Calories"    type="number" value={calories} onChange={setCalories} placeholder="350"/>
+          <GlassInput label="Date"        type="date"   value={date}     onChange={setDate}/>
+          <GlassInput label="Protein (g)" type="number" value={protein}  onChange={setProtein}  placeholder="25"/>
+          <GlassInput label="Carbs (g)"   type="number" value={carbs}    onChange={setCarbs}    placeholder="45"/>
+          <GlassInput label="Fat (g)"     type="number" value={fat}      onChange={setFat}      placeholder="12" style={{ gridColumn:'span 2' }}/>
+        </div>
+
+        
+        <button onClick={handleLog} style={{
+          width:'100%', background:`rgba(${hexToRgb(mealColor)},0.18)`, border:`1.5px solid rgba(${hexToRgb(mealColor)},0.6)`, borderRadius:10, padding:'12px', color:mealColor, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:"'Orbitron',monospace", display:'flex', alignItems:'center', justifyContent:'center', gap:7, boxShadow:'none', minHeight:46,
+        }}>
+          <span style={{ fontSize:18 }}>{MEAL_IC[meal]}</span>
+          <span>LOG {meal.toUpperCase()}</span>
+        </button>
       </div>
 
-      {/* Log meal form */}
-      <div className="glass fade-up delay-1" style={{ padding:28 }}>
-        <SectionTitle icon="🍴" color="var(--blue)">Log Meal</SectionTitle>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <GlassSelect label="Meal Type" value={form.meal} onChange={f('meal')} options={MEALS} />
-          <GlassInput  label="Date" type="date" value={form.date} onChange={f('date')} />
-          <GlassInput
-            label="Food Item" value={form.item} onChange={f('item')}
-            placeholder="e.g. Dal Rice, Roti Sabzi"
-            style={{ gridColumn:'span 2' }}
-          />
-          <GlassInput label="Calories"    type="number" value={form.calories} onChange={f('calories')} placeholder="350" />
-          <GlassInput label="Protein (g)" type="number" value={form.protein}  onChange={f('protein')}  placeholder="25"  />
-          <GlassInput label="Carbs (g)"   type="number" value={form.carbs}    onChange={f('carbs')}    placeholder="45"  />
-          <GlassInput label="Fat (g)"     type="number" value={form.fat}      onChange={f('fat')}      placeholder="12"  />
-        </div>
-        <div style={{ marginTop:20 }}>
-          <Btn onClick={submit} color="var(--blue)" icon={MEAL_ICONS[form.meal]}>
-            Log {form.meal}
-          </Btn>
-        </div>
-      </div>
-
-      {/* History */}
-      <div className="glass fade-up delay-2" style={{ padding:24 }}>
-        <SectionTitle icon="📋" color="var(--muted2)">
-          Meal History ({nutrition.length})
-        </SectionTitle>
-
-        {nutrition.length === 0 ? (
-          <div style={{
-            color:'var(--muted)', textAlign:'center', padding:48,
-            fontFamily:'var(--font-head)', letterSpacing:2, fontSize:12
-          }}>NO MEALS LOGGED YET</div>
+      
+      <div className="glass fade-up delay-2" style={{ padding:20 }}>
+        <SectionTitle icon="📋" color="var(--blue)">Meal History ({nutrition?.length||0})</SectionTitle>
+        {(!nutrition||nutrition.length===0) ? (
+          <div style={{ color:'#94a3b8', textAlign:'center', padding:28, fontFamily:"'Orbitron',monospace", fontSize:11 }}>NO MEALS LOGGED YET</div>
         ) : (
-          <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:380, overflowY:'auto' }}>
-            {nutrition.map(n => (
-              <div key={n.id} className="glass-sm" style={{
-                display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 16px'
-              }}>
-                <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-                  <span style={{ fontSize:18 }}>{MEAL_ICONS[n.meal] || '🍽️'}</span>
-                  <Badge color="var(--blue)">{n.meal}</Badge>
-                  <span style={{ fontWeight:700 }}>{n.item}</span>
-                  <span style={{ color:'var(--muted2)', fontSize:11, fontFamily:'var(--font-head)' }}>{n.date}</span>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {(Array.isArray(nutrition)?nutrition:[]).slice(0,10).map(n=>(
+              <div key={n.id} style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:12, padding:'11px 14px' }}>
+                <span style={{ fontSize:22, flexShrink:0 }}>{MEAL_IC[n.meal]||'🍽️'}</span>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontFamily:"'Orbitron',monospace", fontSize:11, fontWeight:700, color:'#f1f5f9' }}>{n.item}</div>
+                  <div style={{ color:'#94a3b8', fontSize:11, marginTop:2 }}>{n.meal} · {n.date}</div>
                 </div>
-                <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
-                  <span style={{ color:'var(--blue)', fontFamily:'var(--font-head)', fontWeight:700 }}>{n.calories} kcal</span>
-                  {Number(n.protein) > 0 && <span style={{ color:'var(--green)',  fontSize:12 }}>P:{n.protein}g</span>}
-                  {Number(n.carbs)   > 0 && <span style={{ color:'var(--orange)', fontSize:12 }}>C:{n.carbs}g</span>}
-                  {Number(n.fat)     > 0 && <span style={{ color:'var(--pink)',   fontSize:12 }}>F:{n.fat}g</span>}
-                  <button onClick={() => onDelete(n.id)} style={{
-                    background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)',
-                    color:'#ef4444', cursor:'pointer', borderRadius:8,
-                    width:28, height:28, display:'flex', alignItems:'center',
-                    justifyContent:'center', fontSize:13, transition:'all 0.2s'
-                  }}>✕</button>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <div style={{ color:'#38bdf8', fontFamily:"'Orbitron',monospace", fontWeight:700, fontSize:13 }}>{n.calories} kcal</div>
+                  {n.protein>0&&<div style={{ color:'#94a3b8', fontSize:10 }}>P:{n.protein}g C:{n.carbs}g F:{n.fat}g</div>}
                 </div>
+                <button onClick={()=>{onDelete(n.id);showToast('Deleted')}} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, minHeight:'auto', padding:0 }}>✕</button>
               </div>
             ))}
           </div>

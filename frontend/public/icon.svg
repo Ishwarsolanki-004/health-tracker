@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#030712"/>
+  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a1628"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00ffe7"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <!-- Heart rate line -->
+  <polyline points="60,256 140,256 170,160 210,340 250,200 290,300 320,256 460,256"
+    fill="none" stroke="url(#teal)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Glow circle -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="rgba(0,255,231,0.15)" stroke-width="8"/>
+</svg>

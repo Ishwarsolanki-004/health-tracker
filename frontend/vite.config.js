@@ -5,11 +5,24 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true,          // ← Mobile access: phone same WiFi pe
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target:      'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: path => path.replace(/^\/api/, '')
+      }
+    }
+  },
+  build: {
+    outDir:    'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          axios:  ['axios'],
+        }
       }
     }
   }
