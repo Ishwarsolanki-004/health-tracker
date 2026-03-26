@@ -305,8 +305,8 @@ export default function App() {
         {/* Page content */}
         <main style={{
           flex:1,
-          padding: isMobile ? '14px 12px 28px' : '22px 28px',
-          maxWidth:1040, width:'100%', margin:'0 auto',
+          padding: isMobile ? '12px 10px 24px' : '22px 28px',
+          maxWidth:1040, width:'100%', margin:'0 auto', boxSizing:'border-box', overflowX:'hidden',
         }}>
           {tab===0  && <Dashboard       activities={activities} nutrition={nutrition} sleepLogs={sleepLogs} waterToday={waterToday} goals={goals} mood={mood} setMood={setMood} addWater={addWater} showToast={showToast} profile={profile}/>}
           {tab===1  && <Activity        activities={activities} onAdd={addAct} onDelete={delAct} showToast={showToast} userWeight={profile.weight} deviceId={deviceId}/>}

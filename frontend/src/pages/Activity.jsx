@@ -23,175 +23,210 @@ export default function Activity({ activities, onAdd, onDelete, showToast, userW
   const [date,     setDate]     = useState(today)
   const [notes,    setNotes]    = useState('')
 
-  const { steps, active, lastSaved, reset, forceSave } = useStepCounter(deviceId)
+  const { steps, active, lastSaved, hasPermission, requestPermission, reset, forceSave } = useStepCounter(deviceId)
 
-  const act     = ACTIVITIES.find(a => a.type === actType) || ACTIVITIES[1]
-  const autoCal = Math.round(act.met * (userWeight || 70) * ((Number(duration)||0) / 60))
-  const estSteps= Math.round(act.spm * (Number(duration)||0))
+  const act      = ACTIVITIES.find(a => a.type === actType) || ACTIVITIES[1]
+  const autoCal  = Math.round(act.met * (userWeight || 70) * ((Number(duration)||0) / 60))
+  const estSteps = Math.round(act.spm * (Number(duration)||0))
 
   const handleLog = async () => {
-    if (!actType || !duration) { showToast('⚠️ Select activity & duration!'); return }
-    const finalSteps = steps > 0 ? steps : estSteps
-    await onAdd({ type: actType, duration: Number(duration), calories: autoCal, steps: finalSteps, notes, date })
+    if (!duration) { showToast('⚠️ Enter duration!'); return }
+    await onAdd({
+      type: actType, duration: Number(duration),
+      calories: autoCal,
+      steps: steps > 0 ? steps : estSteps,
+      notes, date,
+    })
     showToast(`✅ ${actType} logged!`)
-    setNotes('')
-    reset()
+    setNotes(''); reset()
   }
 
-  const todayActs = activities.filter(a => a.date === today && a.notes !== 'auto-step-count')
-  const autoEntry = activities.find(a => a.date === today && a.notes === 'auto-step-count')
-  const totalSteps= todayActs.reduce((s,a)=>s+(a.steps||0),0) + (autoEntry?.steps||0)
-  const totalCals = todayActs.reduce((s,a)=>s+(a.calories||0),0)
+  const todayActs  = activities.filter(a => a.date === today && a.notes !== 'auto-step-count')
+  const autoEntry  = activities.find(a  => a.date === today && a.notes === 'auto-step-count')
+  const totalSteps = todayActs.reduce((s,a)=>s+(a.steps||0),0) + (autoEntry?.steps||0)
+  const totalCals  = todayActs.reduce((s,a)=>s+(a.calories||0),0)
+
+  // Is this iOS (needs permission tap)?
+  const needsPermission = typeof DeviceMotionEvent !== 'undefined' &&
+    typeof DeviceMotionEvent.requestPermission === 'function' &&
+    !hasPermission
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
-      
-      <div className="glass fade-up" style={{ padding:20, borderTop:'2px solid #00ffe7' }}>
+      {/* Step Counter */}
+      <div className="glass fade-up" style={{ padding:16, borderTop:'2px solid #00ffe7' }}>
         <SectionTitle icon="🦶" color="var(--teal)">Step Counter</SectionTitle>
 
-        <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap', marginBottom:14 }}>
-          <div style={{ textAlign:'center', minWidth:90 }}>
-            <div style={{ fontFamily:"'Orbitron',monospace", fontSize:52, fontWeight:900, color:'#00ffe7', lineHeight:1, textShadow:'0 0 24px rgba(0,255,231,0.4)' }}>
+        {/* iOS Permission banner */}
+        {needsPermission && (
+          <button
+            onClick={async () => {
+              const ok = await requestPermission()
+              if (ok) showToast('✅ Step counting started!')
+              else showToast('⚠️ Permission denied')
+            }}
+            style={{
+              width:'100%', background:'rgba(251,146,60,0.15)',
+              border:'1.5px solid rgba(251,146,60,0.6)',
+              borderRadius:10, padding:'12px',
+              color:'#fb923c', fontWeight:700, fontSize:12,
+              cursor:'pointer', fontFamily:"'Orbitron',monospace",
+              display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+              marginBottom:12, minHeight:46,
+            }}
+          >
+            <span>👆</span><span>TAP TO ENABLE STEP COUNTER</span>
+          </button>
+        )}
+
+        <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+          {/* Step number */}
+          <div style={{ textAlign:'center', minWidth:80 }}>
+            <div style={{ fontFamily:"'Orbitron',monospace", fontSize:44, fontWeight:900, color:'#00ffe7', lineHeight:1 }}>
               {steps.toLocaleString()}
             </div>
-            <div style={{ color:'#94a3b8', fontSize:10, marginTop:4, letterSpacing:1 }}>STEPS</div>
+            <div style={{ color:'#6b7f96', fontSize:9, marginTop:3, letterSpacing:1 }}>STEPS</div>
           </div>
 
-          <div style={{ flex:1, display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ flex:1, display:'flex', flexDirection:'column', gap:8, minWidth:0 }}>
+            {/* Status */}
             <div style={{
-              display:'flex', alignItems:'center', gap:8, padding:'10px 14px',
-              background: active?'rgba(34,211,165,0.1)':'rgba(255,255,255,0.04)',
-              border:`1px solid ${active?'rgba(34,211,165,0.4)':'rgba(255,255,255,0.1)'}`,
-              borderRadius:12
+              display:'flex', alignItems:'center', gap:8, padding:'9px 12px',
+              background: active?'rgba(34,211,165,0.08)':'rgba(255,255,255,0.03)',
+              border:`1px solid ${active?'rgba(34,211,165,0.3)':'rgba(255,255,255,0.08)'}`,
+              borderRadius:10,
             }}>
-              <div style={{ width:10, height:10, borderRadius:'50%', background:active?'#22d3a5':'#475569', boxShadow:active?'0 0 8px #22d3a5':'none', animation:active?'pulse 1s infinite':'none', flexShrink:0 }}/>
-              <span style={{ color:active?'#22d3a5':'#94a3b8', fontFamily:"'Orbitron',monospace", fontSize:10, fontWeight:active?700:400 }}>
-                {active ? 'ACTIVE' : 'STANDBY'}
+              <div style={{ width:8, height:8, borderRadius:'50%', flexShrink:0,
+                background: hasPermission ? (active?'#22d3a5':'#3d4f62') : '#fb923c',
+                boxShadow: active?'0 0 6px #22d3a5':'none',
+                animation: active?'pulse 1s infinite':'none',
+              }}/>
+              <span style={{ color: hasPermission?(active?'#22d3a5':'#6b7f96'):'#fb923c', fontFamily:"'Orbitron',monospace", fontSize:9 }}>
+                {!hasPermission ? 'TAP TO START' : active ? 'COUNTING' : 'READY'}
               </span>
-              {lastSaved && <span style={{ marginLeft:'auto', color:'#475569', fontSize:9 }}>saved {lastSaved}</span>}
+              {lastSaved && <span style={{ marginLeft:'auto', color:'#3d4f62', fontSize:8 }}>saved {lastSaved}</span>}
+            </div>
+
+            {/* Stat pills */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+              {[
+                { l:'Cal',  v:Math.round(steps*0.04),            c:'#fb923c' },
+                { l:'km',   v:(steps*0.00075).toFixed(2),        c:'#38bdf8' },
+                { l:'min',  v:Math.round(steps/100),             c:'#a78bfa' },
+              ].map(s=>(
+                <div key={s.l} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, padding:'7px 4px', textAlign:'center' }}>
+                  <div style={{ color:s.c, fontFamily:"'Orbitron',monospace", fontSize:13, fontWeight:900 }}>{s.v}</div>
+                  <div style={{ color:'#3d4f62', fontSize:8, marginTop:2 }}>{s.l}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:12 }}>
-          {[
-            { label:'Steps',    value:steps.toLocaleString(),              color:'#00ffe7' },
-            { label:'Calories', value:Math.round(steps*0.04)+' kcal',     color:'#fb923c' },
-            { label:'Distance', value:(steps*0.00075).toFixed(2)+' km',   color:'#38bdf8' },
-          ].map(s => (
-            <div key={s.label} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:'10px', textAlign:'center' }}>
-              <div style={{ color:s.color, fontFamily:"'Orbitron',monospace", fontSize:15, fontWeight:900 }}>{s.value}</div>
-              <div style={{ color:'#94a3b8', fontSize:9, marginTop:3 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display:'flex', gap:8 }}>
-          {steps > 0 && (
-            <button onClick={()=>{ forceSave(); showToast('✅ Steps saved!') }}
-              style={{ flex:1, background:'rgba(34,211,165,0.15)', border:'1.5px solid rgba(34,211,165,0.5)', borderRadius:10, padding:'10px', color:'#22d3a5', fontFamily:"'Orbitron',monospace", fontSize:11, fontWeight:700, cursor:'pointer', minHeight:'auto' }}>
+        {/* Buttons */}
+        {steps > 0 && (
+          <div style={{ display:'flex', gap:7, marginTop:10 }}>
+            <button onClick={()=>{ forceSave(); showToast('✅ Saved!') }}
+              style={{ flex:1, background:'rgba(34,211,165,0.15)', border:'1.5px solid rgba(34,211,165,0.5)', borderRadius:9, padding:'9px', color:'#22d3a5', fontFamily:"'Orbitron',monospace", fontSize:10, fontWeight:700, cursor:'pointer', minHeight:'auto' }}>
               💾 Save
             </button>
-          )}
-          {steps > 0 && (
-            <button onClick={()=>{ reset(); showToast('Steps reset') }}
-              style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:10, padding:'10px 14px', color:'#ef4444', fontFamily:"'Orbitron',monospace", fontSize:11, cursor:'pointer', minHeight:'auto' }}>
-              ↺ Reset
+            <button onClick={()=>{ reset(); showToast('Reset') }}
+              style={{ background:'rgba(239,68,68,0.1)', border:'1.5px solid rgba(239,68,68,0.3)', borderRadius:9, padding:'9px 13px', color:'#ef4444', fontFamily:"'Orbitron',monospace", fontSize:10, cursor:'pointer', minHeight:'auto' }}>
+              ↺
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      
-      <div className="glass fade-up delay-1" style={{ padding:22, borderTop:'2px solid #fb923c' }}>
+      {/* Log Activity */}
+      <div className="glass fade-up delay-1" style={{ padding:16, borderTop:'2px solid #fb923c' }}>
         <SectionTitle icon="➕" color="var(--orange)">Log Activity</SectionTitle>
 
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:8, marginBottom:16 }}>
+        {/* Activity grid — 5 cols on desktop, 5 on mobile */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6, marginBottom:14 }}>
           {ACTIVITIES.map(a => (
             <button key={a.type} onClick={()=>setActType(a.type)} style={{
-              background: actType===a.type?'rgba(251,146,60,0.18)':'rgba(255,255,255,0.04)',
-              border:`2px solid ${actType===a.type?'#fb923c':'rgba(255,255,255,0.1)'}`,
-              borderRadius:12, padding:'10px 4px', cursor:'pointer',
-              display:'flex', flexDirection:'column', alignItems:'center', gap:5,
-              transition:'all 0.18s', minHeight:'auto',
+              background: actType===a.type?'rgba(251,146,60,0.15)':'rgba(255,255,255,0.03)',
+              border:`1.5px solid ${actType===a.type?'rgba(251,146,60,0.6)':'rgba(255,255,255,0.08)'}`,
+              borderRadius:10, padding:'9px 4px', cursor:'pointer',
+              display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+              minHeight:'auto', transition:'all 0.15s',
             }}>
-              <span style={{ fontSize:20 }}>{a.icon}</span>
-              <span style={{ fontSize:9, color:actType===a.type?'#fb923c':'#94a3b8', fontFamily:"'Orbitron',monospace", fontWeight:actType===a.type?700:400 }}>{a.type}</span>
+              <span style={{ fontSize:18 }}>{a.icon}</span>
+              <span style={{ fontSize:8, color:actType===a.type?'#fb923c':'#6b7f96', fontFamily:"'Orbitron',monospace", fontWeight:actType===a.type?700:400, letterSpacing:0.3 }}>{a.type}</span>
             </button>
           ))}
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
           <GlassInput label="Date" type="date" value={date} onChange={setDate}/>
           <GlassInput label="Duration (min)" type="number" value={duration} onChange={setDuration} min="1"/>
         </div>
-        <GlassInput label="Notes" value={notes} onChange={setNotes} placeholder="Optional" style={{ marginBottom:14 }}/>
+        <GlassInput label="Notes" value={notes} onChange={setNotes} placeholder="Optional" style={{ marginBottom:12 }}/>
 
-        <div style={{ background:'rgba(251,146,60,0.08)', border:'1px solid rgba(251,146,60,0.2)', borderRadius:12, padding:'12px 16px', display:'flex', justifyContent:'space-around', marginBottom:14, flexWrap:'wrap', gap:8 }}>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ color:'#fb923c', fontFamily:"'Orbitron',monospace", fontSize:24, fontWeight:900 }}>{autoCal}</div>
-            <div style={{ color:'#94a3b8', fontSize:10 }}>kcal</div>
-          </div>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontSize:24, fontWeight:900 }}>
-              {steps>0 ? steps.toLocaleString() : estSteps.toLocaleString()}
+        {/* Preview */}
+        <div style={{ display:'flex', justifyContent:'space-around', background:'rgba(251,146,60,0.07)', border:'1px solid rgba(251,146,60,0.18)', borderRadius:10, padding:'11px', marginBottom:12, flexWrap:'wrap', gap:8 }}>
+          {[
+            { v:autoCal, l:'kcal', c:'#fb923c' },
+            { v:steps>0?steps.toLocaleString():estSteps.toLocaleString(), l:steps>0?'live steps':'est. steps', c:'#00ffe7' },
+            { v:duration||0, l:'min', c:'#a78bfa' },
+          ].map(s=>(
+            <div key={s.l} style={{ textAlign:'center' }}>
+              <div style={{ color:s.c, fontFamily:"'Orbitron',monospace", fontSize:20, fontWeight:900 }}>{s.v}</div>
+              <div style={{ color:'#6b7f96', fontSize:9 }}>{s.l}</div>
             </div>
-            <div style={{ color:'#94a3b8', fontSize:10 }}>steps</div>
-          </div>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ color:'#a78bfa', fontFamily:"'Orbitron',monospace", fontSize:24, fontWeight:900 }}>{duration||0}</div>
-            <div style={{ color:'#94a3b8', fontSize:10 }}>min</div>
-          </div>
+          ))}
         </div>
 
         <button onClick={handleLog} style={{
-          width:'100%', background:'rgba(251,146,60,0.18)', border:'1.5px solid rgba(251,146,60,0.6)', borderRadius:10,
-          padding:'12px', color:'#fb923c', fontWeight:700, fontSize:12,
-          cursor:'pointer', fontFamily:"'Orbitron',monospace",
+          width:'100%', background:'rgba(251,146,60,0.15)',
+          border:'1.5px solid rgba(251,146,60,0.6)',
+          borderRadius:10, padding:'12px', color:'#fb923c',
+          fontWeight:700, fontSize:12, cursor:'pointer',
+          fontFamily:"'Orbitron',monospace",
           display:'flex', alignItems:'center', justifyContent:'center', gap:7,
-          boxShadow:'none', minHeight:46,
+          minHeight:46,
         }}>
-          <span style={{ fontSize:18 }}>🏃</span>
-          <span>LOG {actType.toUpperCase()}</span>
+          <span>🏃</span><span>LOG {actType.toUpperCase()}</span>
         </button>
       </div>
 
-      
-      <div className="glass fade-up delay-2" style={{ padding:20 }}>
+      {/* Today */}
+      <div className="glass fade-up delay-2" style={{ padding:16 }}>
         <SectionTitle icon="📋" color="var(--teal)">Today</SectionTitle>
-        <div style={{ display:'flex', gap:16, marginBottom:12, flexWrap:'wrap' }}>
-          <div><span style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontWeight:900, fontSize:20 }}>{totalSteps.toLocaleString()}</span><span style={{ color:'#94a3b8', fontSize:11, marginLeft:4 }}>steps</span></div>
-          <div><span style={{ color:'#fb923c', fontFamily:"'Orbitron',monospace", fontWeight:900, fontSize:20 }}>{totalCals}</span><span style={{ color:'#94a3b8', fontSize:11, marginLeft:4 }}>kcal</span></div>
+        <div style={{ display:'flex', gap:14, marginBottom:10, flexWrap:'wrap' }}>
+          <span style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontWeight:900, fontSize:18 }}>{totalSteps.toLocaleString()} <span style={{ color:'#6b7f96', fontSize:11, fontWeight:400 }}>steps</span></span>
+          <span style={{ color:'#fb923c', fontFamily:"'Orbitron',monospace", fontWeight:900, fontSize:18 }}>{totalCals} <span style={{ color:'#6b7f96', fontSize:11, fontWeight:400 }}>kcal</span></span>
         </div>
 
         {autoEntry?.steps > 0 && (
-          <div style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(0,255,231,0.06)', border:'1px solid rgba(0,255,231,0.2)', borderRadius:12, padding:'11px 14px', marginBottom:8 }}>
-            <span style={{ fontSize:22 }}>🦶</span>
-            <div style={{ flex:1 }}>
-              <div style={{ fontFamily:"'Orbitron',monospace", fontSize:11, fontWeight:700, color:'#f1f5f9' }}>Walk</div>
-              <div style={{ color:'#94a3b8', fontSize:11, marginTop:2 }}>{today}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(0,255,231,0.05)', border:'1px solid rgba(0,255,231,0.18)', borderRadius:10, padding:'10px 12px', marginBottom:7 }}>
+            <span style={{ fontSize:18 }}>🦶</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:"'Orbitron',monospace", fontSize:10, fontWeight:700, color:'#dde3ed' }}>Auto Walk</div>
+              <div style={{ color:'#6b7f96', fontSize:10, marginTop:1 }}>{today}</div>
             </div>
-            <span style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontSize:13, fontWeight:700 }}>{autoEntry.steps.toLocaleString()} steps</span>
+            <span style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontSize:12, fontWeight:700, flexShrink:0 }}>{autoEntry.steps.toLocaleString()}</span>
             <Badge color="var(--teal)">AUTO</Badge>
           </div>
         )}
 
-        {todayActs.length === 0 && !autoEntry && (
-          <div style={{ color:'#94a3b8', textAlign:'center', padding:24, fontFamily:"'Orbitron',monospace", fontSize:11 }}>NO ACTIVITIES YET</div>
+        {todayActs.length===0 && !autoEntry && (
+          <div style={{ color:'#3d4f62', textAlign:'center', padding:20, fontFamily:"'Orbitron',monospace", fontSize:10 }}>NO ACTIVITIES YET</div>
         )}
 
-        {todayActs.map(a => (
-          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'11px 14px', marginBottom:8 }}>
-            <span style={{ fontSize:22 }}>{ACTIVITIES.find(x=>x.type===a.type)?.icon||'🏃'}</span>
-            <div style={{ flex:1 }}>
-              <div style={{ fontFamily:"'Orbitron',monospace", fontSize:11, fontWeight:700, color:'#f1f5f9' }}>{a.type}</div>
-              <div style={{ color:'#94a3b8', fontSize:11, marginTop:2 }}>{a.duration} min{a.notes&&a.notes!=='auto-step-count'?` · ${a.notes}`:''}</div>
+        {todayActs.map(a=>(
+          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:'10px 12px', marginBottom:7 }}>
+            <span style={{ fontSize:18, flexShrink:0 }}>{ACTIVITIES.find(x=>x.type===a.type)?.icon||'🏃'}</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:"'Orbitron',monospace", fontSize:10, fontWeight:700, color:'#dde3ed', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.type}</div>
+              <div style={{ color:'#6b7f96', fontSize:10, marginTop:1 }}>{a.duration} min</div>
             </div>
-            <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-              {a.calories>0 && <span style={{ color:'#fb923c', fontFamily:"'Orbitron',monospace", fontSize:12, fontWeight:700 }}>{a.calories} kcal</span>}
-              {a.steps>0   && <span style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontSize:11 }}>{Number(a.steps).toLocaleString()} steps</span>}
-              <button onClick={()=>{ onDelete(a.id); showToast('Deleted') }} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', borderRadius:8, width:28, height:28, cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, minHeight:'auto', padding:0 }}>✕</button>
+            <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
+              {a.calories>0&&<span style={{ color:'#fb923c', fontFamily:"'Orbitron',monospace", fontSize:11, fontWeight:700 }}>{a.calories}</span>}
+              {a.steps>0&&<span style={{ color:'#00ffe7', fontFamily:"'Orbitron',monospace", fontSize:10 }}>{Number(a.steps).toLocaleString()}</span>}
+              <button onClick={()=>{onDelete(a.id);showToast('Deleted')}} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444', borderRadius:7, width:26, height:26, cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', minHeight:'auto', padding:0 }}>✕</button>
             </div>
           </div>
         ))}
